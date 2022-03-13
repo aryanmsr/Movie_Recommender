@@ -1,0 +1,227 @@
+---
+title: "Movie Recommendation System"
+author: "Aryan Mishra"
+output:
+  word_document: default
+---
+
+
+
+```{r}
+#Loading the relevant libraries
+library(dplyr) 
+library(ggplot2)
+library(recommenderlab)
+setwd('/Users/aryan/Desktop/MSBA_Spring_22/MRKT_9653_ML/Research_Paper')
+```
+
+```{r}
+data(MovieLense) # loads dataset
+class(MovieLense)
+movie_ratings <- MovieLense 
+remove(MovieLense)
+```
+
+```{r}
+library(pryr)
+object_size(movie_ratings) #Calculating size of realRatingMatrix object. Almost 9 times more efficient!
+object_size(as(movie_ratings, "matrix"))
+
+```
+
+```{r}
+head(MovieLenseMeta)
+```
+
+```{r}
+head(MovieLenseUser)
+```
+```{r}
+summary(MovieLenseUser)
+```
+
+```{r}
+summary(MovieLenseMeta)
+```
+
+
+```{r}
+print(nratings(movie_ratings)) #Number of Total Ratings
+```
+
+
+
+```{r}
+print(rowCounts(movie_ratings[1:5,])) #First 5 users and their ratings 
+```
+
+
+
+```{r}
+getRatingMatrix(movie_ratings[1:10, 1:5]) #Subset of Ratings Matrix of the first 10 users and 5 movies.
+```
+
+```{r}
+image(movie_ratings[1:20,1:20]) #Nice image of 20 by 20 subset of ratings matrix
+```
+
+
+```{r}
+as(movie_ratings[1, ], "list")[[1]][1:10] # The first 10 movies rated by user 1
+```
+
+
+
+```{r}
+#In this chunk, we will get a summary of the ratings matrix and plot a bar plot of the ratings distribution
+summary(getRatings(movie_ratings))
+data.frame(ratings = getRatings(movie_ratings)) %>% ggplot(aes(ratings)) + geom_bar(width = 0.75, fill = "#FF6666") +  labs(title = 'Movies Ratings Distribution')
+
+```
+
+```{r}
+#Plotting the number of ratings per MovieLense reviewer.
+summary(rowCounts(movie_ratings))
+rowCounts(movie_ratings) %>%
+data.frame(reviews_per_person = .) %>%
+  ggplot(aes(x = reviews_per_person)) + 
+    geom_histogram(aes(y = ..density..), binwidth = 20, fill = "#42adf5") +
+    scale_y_continuous(limits = c(0,.0125), 
+                       breaks = seq(0, .0125, by = 0.0025),
+                       labels = seq(0, .0125, by = 0.0025)) +
+    labs(title = 'Number of Ratings Per MovieLense Reviewer')
+```
+
+```{r}
+#Plotting the number of reviews per MovieLense listed movie.
+summary(colCounts(movie_ratings))
+colCounts(movie_ratings) %>%
+  data.frame(movie_review_count = .) %>%
+  ggplot(aes(x = movie_review_count)) + 
+    geom_histogram(aes(y = ..density..), binwidth = 20, fill = "#f5b642") +
+    scale_y_continuous(limits = c(0,.0175)) +
+    labs(title = 'Number of Reviews Per MovieLense listed Movie')
+
+```
+
+
+```{r}
+#Box plot of average rating per user.
+summary(rowMeans(movie_ratings))
+rowMeans(movie_ratings) %>%
+  data.frame(mean_rating_per_user = .) %>%
+  ggplot(aes(x = mean_rating_per_user)) + 
+    geom_boxplot(alpha=0.5, width=0.15, fill = "#00AFBB", color = "#00AFBB") + 
+    labs(title = 'Average Rating per User Boxplot')
+```
+
+```{r}
+#Box plot of average rating per movie.
+summary(colMeans(movie_ratings))
+colMeans(movie_ratings) %>%
+  data.frame(mean_rating_per_movie = .) %>%
+  ggplot(aes(x = mean_rating_per_movie)) + 
+    geom_boxplot(alpha=0.5, width=0.15,fill = "#FFDB6D", color = "#C4961A") + 
+    labs(title = 'Average Rating per Movie Boxplot')
+```
+
+
+```{r}
+#Looking at the user similarities between the first five users.
+user_similarity <- similarity(movie_ratings[1:5, ],
+                             method = "cosine",
+                             which = "users")
+as.matrix(user_similarity)
+```
+
+
+```{r}
+#Looking at the item (movie) similarities of the first five movies.
+movie_similarity <- similarity(movie_ratings[, 1:5], method =
+                                 "cosine", which = "items")
+as.matrix(movie_similarity)
+```
+
+
+```{r}
+#Normalizing movie ratings before we fit the UBCF model.
+norm_movie_ratings<- normalize(movie_ratings, method = 'center')
+```
+
+```{r}
+train_proportion <- .75 #Training data is 75% of the data set.
+min(rowCounts(movie_ratings)) #Counting the minimum number of reviews by a reviewer. 
+items_per_test_user_keep <- 10 #This will be the threshold for top N recommended movies. Should be > than min(rowCounts(movie_ratings))
+good_threshold <- 4 #For Binary classification
+```
+
+
+```{r}
+set.seed(123, sample.kind = "Rounding")
+#Creating the training scheme for our model.
+model_train_scheme <- movie_ratings %>%
+  evaluationScheme(method = 'split', # Single train/test split
+                   train = train_proportion, # Proportion of rows to train.
+                   given = items_per_test_user_keep, # Threshold for top N recommended movies.
+                   goodRating = good_threshold, #For Binary classification
+                   k = 1) 
+```
+
+
+```{r}
+#This will be the list of parameters for our model.
+model_params <- list(method = "cosine",
+                     nn = 10, # Find each user's top 10 similar users
+                     sample = FALSE, #Already performed train/test split.
+                     normalize = "center")
+model1 <- getData(model_train_scheme, "train") %>% #Fitting UBCF model to training set.
+  Recommender(method = "UBCF", parameter = model_params)
+```
+
+```{r}
+model1_pred <- predict(model1, getData(model_train_scheme, "known"), type = "ratings") #Testing model on test set (new data)
+model1_pred #Our new ratings matrix
+```
+
+```{r}
+getRatingMatrix(model1_pred[1:10, 1:5]) #Snippet of new ratings matrix
+```
+
+
+```{r}
+test_error <- calcPredictionAccuracy(model1_pred, getData(model_train_scheme, "unknown"), byUser = TRUE) #Calculating test error for each user.
+head(test_error)  #Errors of test users. 
+```
+
+```{r}
+#Plotting distribution of RMSE on predicted recommendations per test user. 
+test_user_error_data <- data.frame(user_id = as.numeric(row.names(test_error)),
+                                   rmse = test_error[, 1],
+                                   predicted_items_cnt = rowCounts(getData(model_train_scheme, "unknown")))
+test_user_error_data %>%
+  ggplot(aes(rmse)) +  
+    geom_histogram(aes(y = ..density..), binwidth = 0.055, fill = "#e69191") +
+    labs(title = 'RMSE on Predicted Recommendations per Test User',
+         subtitle = "User-Based Collaborative Filtering using Cosine Similarity")
+```
+```{r}
+total_test_error <- calcPredictionAccuracy(model1_pred, getData(model_train_scheme, "unknown"), byUser = FALSE) #Calculating overall test error.
+total_test_error
+```
+
+```{r}
+#Getting the top 10 recommendations per test user.
+top_recommendations <- 10 
+predicted_recommendations <- predict(object = model1,
+                                     newdata =  getData(model_train_scheme, "known"),
+                                     n = top_recommendations)
+predicted_recommendations
+```
+
+```{r}
+#Displaying the top 10 recommendations for the first test user. 
+first_test_user <- predicted_recommendations@items[[1]] 
+movies_first_test_user <- predicted_recommendations@itemLabels[first_test_user]
+movies_first_test_user
+```
+

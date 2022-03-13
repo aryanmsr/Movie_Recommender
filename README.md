@@ -7,7 +7,7 @@
 </div>
 
 This [notebook](https://github.com/aryanmsr/Movie_Recommender/blob/main/movie_recommendation_system.Rmd) contains the code used to build a basic movie recommendation 
-system that utilizes User-Based Collaborative Filtering to predict user ratings of movies. Refer to my research [paper](https://github.com/aryanmsr/Movie_Recommender/blob/main/am5696_Application_of_User_Based_Collaborative_Filtering_for_Streaming_Recommendations.pdf)
+system that utilizes User-Based Collaborative Filtering to predict user ratings of movies. The dataset used is a subset of the [MovieLens](https://grouplens.org/datasets/movielens/) database. Refer to my research [paper](https://github.com/aryanmsr/Movie_Recommender/blob/main/am5696_Application_of_User_Based_Collaborative_Filtering_for_Streaming_Recommendations.pdf)
 for more details.
 
 As always, any feedback, queries or concerns regarding this notebook are highly apprecaited. Feel free to email me at aryanmsr@gmail.com.
